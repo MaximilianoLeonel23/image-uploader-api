@@ -1,39 +1,47 @@
 import express from "express";
-import mysql from "mysql2";
-import bodyParser from "body-parser";
-
+import cors from "cors";
+import fs from "fs";
 const app = express();
+import path from "path";
+import { fileURLToPath } from "url";
 
-const dbConfig = {
-  host: "localhost",
-  user: "root",
-  password: "123456789",
-  database: "image_uploader_db",
-};
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-const connection = mysql.createConnection(dbConfig);
+app.use(cors());
 
-connection.connect(function (err) {
-  if (err) {
-    console.error("error connecting: " + err.stack);
-    return;
-  }
+import multer from "multer";
 
-  console.log("conexion exitosa");
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "Images");
+  },
+  filename: (req, file, cb) => {
+    console.log(file);
+    cb(null, Date.now() + path.extname(file.originalname));
+  },
 });
 
-// Configurar body-parser para manejar JSON y formularios
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+const upload = multer({ storage: storage });
 
-app.get("/", (req, res) => {
-  res.json({ message: "a little dragon" });
+app.post("/upload", upload.single("image"), (req, res) => {
+  const uploadFilename = req.file.filename;
+  console.log("uploadFilename", uploadFilename);
+
+  res.status(201).json({ message: "Imagen subida", fileName: uploadFilename });
 });
 
-app.get("/image-uploaded/:id", (req, res) => {
-  const imageId = req.params.id;
-  console.log(imageId);
-  res.send(imageId);
+app.get("/images/:nameImage", (req, res) => {
+  const nameImage = req.params.nameImage;
+  const filePath = path.join(__dirname, "Images", nameImage);
+
+  fs.access(filePath, fs.constants.F_OK, (error) => {
+    if (error) {
+      res.status(404).json({ message: "La imagen no fue encontrada" });
+    } else {
+      res.sendFile(filePath);
+    }
+  });
 });
 
 const port = 3000;
